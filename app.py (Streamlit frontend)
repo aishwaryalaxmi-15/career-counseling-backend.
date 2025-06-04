@@ -1,0 +1,79 @@
+import streamlit as st
+import requests
+
+API_URL = "http://127.0.0.1:5000"  # Change if your backend is hosted elsewhere
+
+def register():
+    st.subheader("Register")
+    username = st.text_input("Username", key="reg_username")
+    email = st.text_input("Email", key="reg_email")
+    password = st.text_input("Password", type="password", key="reg_password")
+    if st.button("Register"):
+        payload = {"username": username, "email": email, "password": password}
+        res = requests.post(f"{API_URL}/register", json=payload)
+        if res.status_code == 201:
+            st.success("Registration successful! Please login.")
+        else:
+            st.error(res.json().get("msg", "Error during registration"))
+
+def login():
+    st.subheader("Login")
+    username = st.text_input("Username", key="login_username")
+    password = st.text_input("Password", type="password", key="login_password")
+    if st.button("Login"):
+        payload = {"username": username, "password": password}
+        res = requests.post(f"{API_URL}/login", json=payload)
+        if res.status_code == 200:
+            token = res.json()["access_token"]
+            st.session_state['token'] = token
+            st.success("Login successful!")
+        else:
+            st.error(res.json().get("msg", "Login failed"))
+
+def view_careers():
+    st.subheader("Available Careers")
+    res = requests.get(f"{API_URL}/careers")
+    if res.status_code == 200:
+        careers = res.json()
+        for c in careers:
+            st.markdown(f"### {c['name']}")
+            st.write(c['description'])
+            st.write(f"**Skills Required:** {c['skills_required']}")
+            st.write(f"**Average Salary:** {c['average_salary']}")
+            if st.button(f"View Courses for {c['name']}"):
+                view_courses(c['id'])
+    else:
+        st.error("Could not fetch careers")
+
+def view_courses(career_id):
+    st.subheader("Courses")
+    res = requests.get(f"{API_URL}/courses/{career_id}")
+    if res.status_code == 200:
+        courses = res.json()
+        for course in courses:
+            st.markdown(f"**{course['title']}**")
+            st.write(course['description'])
+            st.markdown(f"[Course Link]({course['url']})")
+    else:
+        st.error("Could not fetch courses")
+
+def main():
+    st.title("Career Counseling Chatbot Frontend")
+
+    if 'token' not in st.session_state:
+        page = st.sidebar.selectbox("Choose action", ["Login", "Register", "View Careers"])
+        if page == "Login":
+            login()
+        elif page == "Register":
+            register()
+        else:
+            view_careers()
+    else:
+        st.sidebar.write("Logged in")
+        if st.sidebar.button("Logout"):
+            st.session_state.pop('token')
+            st.experimental_rerun()
+        view_careers()
+
+if __name__ == "__main__":
+    main()
