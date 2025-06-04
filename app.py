@@ -59,3 +59,81 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True)
+# Add this below the User model in app.py
+
+class Career(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    skills_required = db.Column(db.Text)
+    average_salary = db.Column(db.String(50))
+
+class Course(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    career_id = db.Column(db.Integer, db.ForeignKey('career.id'), nullable=False)
+    url = db.Column(db.String(250))
+
+    career = db.relationship('Career', backref=db.backref('courses', lazy=True))
+
+# API routes for Career and Course
+
+@app.route('/careers', methods=['POST'])
+@jwt_required()
+def add_career():
+    data = request.get_json()
+    career = Career(
+        name=data['name'],
+        description=data['description'],
+        skills_required=data.get('skills_required', ''),
+        average_salary=data.get('average_salary', '')
+    )
+    db.session.add(career)
+    db.session.commit()
+    return jsonify({"msg": "Career added", "career_id": career.id}), 201
+
+@app.route('/careers', methods=['GET'])
+def get_careers():
+    careers = Career.query.all()
+    result = []
+    for c in careers:
+        result.append({
+            "id": c.id,
+            "name": c.name,
+            "description": c.description,
+            "skills_required": c.skills_required,
+            "average_salary": c.average_salary
+        })
+    return jsonify(result)
+
+@app.route('/courses', methods=['POST'])
+@jwt_required()
+def add_course():
+    data = request.get_json()
+    career = Career.query.get(data['career_id'])
+    if not career:
+        return jsonify({"msg": "Career not found"}), 404
+
+    course = Course(
+        title=data['title'],
+        description=data['description'],
+        career_id=data['career_id'],
+        url=data.get('url', '')
+    )
+    db.session.add(course)
+    db.session.commit()
+    return jsonify({"msg": "Course added", "course_id": course.id}), 201
+
+@app.route('/courses/<int:career_id>', methods=['GET'])
+def get_courses_by_career(career_id):
+    courses = Course.query.filter_by(career_id=career_id).all()
+    result = []
+    for c in courses:
+        result.append({
+            "id": c.id,
+            "title": c.title,
+            "description": c.description,
+            "url": c.url
+        })
+    return jsonify(result)
